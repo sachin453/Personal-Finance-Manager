@@ -1,0 +1,68 @@
+[
+  {
+    "date":"2025-08-01",
+    "description":"Walmart Grocery",
+    "amount":-120,
+    "category":"Groceries"
+  },
+  {
+    "date":"2025-08-03",
+    "description":"Netflix Subscription",
+    "amount":-15,
+    "category":"Entertainment"
+  },
+  {
+    "date":"2025-08-05",
+    "description":"Electricity Bill",
+    "amount":-60,
+    "category":"Utilities"
+  },
+  {
+    "date":"2025-08-06",
+    "description":"Salary",
+    "amount":2000,
+    "category":"Income"
+  },
+  {
+    "date":"2025-08-07",
+    "description":"Restaurant Dinner",
+    "amount":-45,
+    "category":"Entertainment"
+  },
+  {
+    "date":"2025-08-15",
+    "description":"Shopping",
+    "amount":-200,
+    "category":"Groceries"
+  },
+  {
+    "date":"2025-09-01",
+    "description":"Walmart Grocery",
+    "amount":-120,
+    "category":"Groceries"
+  },
+  {
+    "date":"2025-09-03",
+    "description":"Netflix Subscription",
+    "amount":-15,
+    "category":"Entertainment"
+  },
+  {
+    "date":"2025-09-05",
+    "description":"Electricity Bill",
+    "amount":-60,
+    "category":"Utilities"
+  },
+  {
+    "date":"2025-09-06",
+    "description":"Salary",
+    "amount":2000,
+    "category":"Income"
+  },
+  {
+    "date":"2025-09-07",
+    "description":"Restaurant Dinner",
+    "amount":-45,
+    "category":"Entertainment"
+  }
+]

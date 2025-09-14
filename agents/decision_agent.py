@@ -12,7 +12,7 @@ class DecisionAgent:
         Forecasted total expenses: ${forecast_expenses}
         Savings goal: ${savings_goal}
 
-        Suggest a clear step-by-step plan to meet the goal.
+        Suggest a clear plan to meet the goal less than 50 words. It should be compact and in points.
         """
         response = self.client.generate_response(prompt)
         return response.strip()
