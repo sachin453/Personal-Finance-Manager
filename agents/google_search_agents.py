@@ -24,7 +24,7 @@ class GoogleSearchAgent:
             "q": query,
             "key": self.API_KEY,
             "cx": self.CX,
-            "num": 3  # top 3 results
+            "num": 6  # top 3 results
         }
         response = requests.get(url, params=params)
         data = response.json()
@@ -39,7 +39,7 @@ class GoogleSearchAgent:
             results.append({
                 "title": item.get("title", ""),
                 "snippet": item.get("snippet", ""),
-                "link": item.get("link", "")
+                # "link": item.get("link", "")
             })
         return results
     
@@ -50,32 +50,37 @@ class GoogleSearchAgent:
                 f"[Result {i}]\n"
                 f"Title: {item['title']}\n"
                 f"Snippet: {item['snippet']}\n"
-                f"URL: {item['link']}\n\n"
+                # f"URL: {item['link']}\n\n"
             )
         return formatted
     
 
-    def answer_from_search_with_gemini(self, query):
+    def answer_from_search_with_gemini(self, query:str)-> str:
         search_results = self.google_search_tool(query)
         context = self.format_results_for_llm(search_results)
         
-        prompt = (
-            f"You are a highly accurate assistant.\n"
-            f"The user asked: \"{query}\"\n\n"
-            f"Here are search results:\n"
-            f"{context}\n\n"
-            f"Analyze these results and provide a concise and factual answer.\n"
-            f"If unsure, say \"I could not find enough information\"."
-        )
+        prompt = f"""
+        You are a highly accurate assistant.
 
-        response = self.llm.generate_response(prompt)
-        # response = self.llm.generate_response(
-        #     {"contents": [{"parts": [{"text": prompt}]}]}
-        # )
-        
-        # extract content depending on Gemini response format
-        # answer = resp.text  # or whatever the field is
-        # return answer
+        The user asked: "{query}"
+
+        Here are the search results:
+        {context}
+
+        Your task:
+        1. Carefully analyze the snippets.
+        2. Identify the snippet that directly answers the question.
+        3. Provide a concise and factual answer based ONLY on the search results.
+        4. If multiple results conflict, mention the uncertainty.
+        5. If no snippet clearly answers the question, respond with: "I could not find enough information."
+
+        Answer:
+        """
+
+        messages=[{"role": "user", "content": prompt}]
+        # print(prompt)
+
+        response = self.llm.generate_response(messages)
         return response
 
 
