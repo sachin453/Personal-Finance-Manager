@@ -8,7 +8,8 @@ class GoogleSearchAgent:
         self.API_KEY = os.getenv("GOOGLE_API_KEY")
         self.CX = os.getenv("CX")
         # self.llm = llms.gemini("gemini-2.0-flash")
-        self.llm = llms.qwen()
+        # self.llm = llms.qwen()
+        self.llm = llms.gemini("gemini-1.5-flash")
 
         # Debugging: mask the API key to see if it's loaded
         if not self.API_KEY or not self.CX:
