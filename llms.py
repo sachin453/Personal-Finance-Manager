@@ -1,4 +1,11 @@
 from google import genai
+import config
+from langchain.chat_models.base import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
+from langchain_core.outputs import ChatResult, ChatGeneration
+import os
+import config
+from openai import OpenAI
 
 class gemini:
     def __init__(self, model_name: str):
@@ -31,3 +38,33 @@ class gemini:
         print("model = gemini('gemini-1.5-flash')")
         print("response = model.generate_response('Your prompt here')")
         print("print(response)")
+
+
+
+class qwen:
+    def __init__(self):
+        pass
+        self.client = OpenAI(
+            base_url="https://router.huggingface.co/v1",
+            api_key=os.environ["HF_TOKEN"],)
+        
+    def generate_response(self, prompt: str) -> str:
+        completion = self.client.chat.completions.create(
+            model="Qwen/Qwen2.5-7B-Instruct:together",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a factual answering assistant. Use only the provided search results to answer."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+        )
+
+        # print(completion.choices[0].message)
+        return completion.choices[0].message.content
+
+
+
