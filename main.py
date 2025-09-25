@@ -22,7 +22,7 @@ if __name__ == "__main__":
     graph.add_edge("planner", "executor")
     graph.add_edge("executor", END)
     app = graph.compile()
-    initial = {"question": "Can you write biography of Indian prime minister Narendra Modi?"}
+    initial = {"question": "If today is Sunday, What will be the date of next sunday?"}
     final_state = app.invoke(initial)
     print("Plan (parsed):", final_state.get("plan"))
     print("Step results:", final_state.get("step_results"))

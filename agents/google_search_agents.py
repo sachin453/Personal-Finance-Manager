@@ -7,7 +7,6 @@ class GoogleSearchAgent:
     def __init__(self):
         self.API_KEY = os.getenv("GOOGLE_API_KEY")
         self.CX = os.getenv("CX")
-        # self.llm = llms.gemini("gemini-2.0-flash")
         # self.llm = llms.qwen()
         self.llm = llms.gemini("gemini-1.5-flash")
 

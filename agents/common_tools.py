@@ -1,10 +1,11 @@
 from datetime import datetime
-from typing import TypedDict , Optional, List, Dict, Any
+from typing import TypedDict , Optional, List, Dict, Any , Annotated
 import re
 import json
 from agents import google_search_agents
 import llms
 from llms import init_llm
+from langgraph.graph.message import add_messages
 
 
 class AgentState(TypedDict, total=False):
@@ -17,6 +18,7 @@ class AgentState(TypedDict, total=False):
     retries: int
     failed: bool
     failed_step: Optional[int]
+    messages:Annotated[List , add_messages]
 
 def parse_json_from_text(text: str):
     text = text.strip()
@@ -105,7 +107,7 @@ def executor_node(state: AgentState) -> AgentState:
         action = action.lower()
         if action == "date":
             # common_tools.date_tool expects a question-like input ("today", "day after tomorrow", or full)
-            return date_tool()
+            return date_tool(input_text)
         if action == "calculator":
             # our calculator expects either an expression string or state key; pass expression directly
             return calculator_tool(input_text)
@@ -184,21 +186,18 @@ def executor_node(state: AgentState) -> AgentState:
 
 
 
-def calculator_tool(state: AgentState) -> AgentState:
+def calculator_tool(expression:str) -> str:
     print(">>> CALCULATOR TOOL CALLED <<<")
-    expression = state.get('calculation')
     print(f"Evaluating expression: {expression}")
     try:
-        # WARNING: Using eval can be dangerous. In production, consider using a safe math parser.
         result = eval(expression, {"__builtins__": None}, {})
-        state['calculation_result'] = str(result)
+        return str(result)
     except Exception as e:
-        state['calculation_result'] = f"Error evaluating expression: {e}"
-    return state
+        return f"Error evaluating expression: {e}"
+
     
 
-def date_tool():
+def date_tool(query:str) -> str:
     print(">>> DATE TOOL CALLED <<<")
     today = datetime.today()
     return today.strftime("%Y-%m-%d")
-    return state
