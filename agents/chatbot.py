@@ -31,6 +31,10 @@ class ChatbotAgent:
         self.memory = MemorySaver()
         self.connect_nodes()
 
+        ### dialogue state
+        self.dialogue_memory = None
+        self.dialogue_state = None
+
     def connect_nodes(self):
         self.builder = StateGraph(State)
         self.builder.add_node("chatbot", self.chatbot)
@@ -70,3 +74,23 @@ class ChatbotAgent:
                     config=config
                 )
                 print("Bot:", state["messages"][-1].content)
+
+    def dialogue(self, query:str) -> str:
+        self.dialogue_memory = MemorySaver()
+        self.dialogue_state = None
+        config = { 'configurable': { 'thread_id' : '2'} }
+
+        user_message = {"role": "user", "content": query}
+        if self.dialogue_state is None:
+            self.dialogue_state = self.graph.invoke(
+                {"messages": [SYSTEM_PROMPT, user_message]},
+                config=config
+            )
+            return self.dialogue_state["messages"][-1].content
+        else:
+            self.dialogue_state = self.graph.invoke(
+                {"messages": self.dialogue_state["messages"] + [user_message]},
+                config=config
+            )
+            return self.dialogue_state["messages"][-1].content
+        
