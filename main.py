@@ -45,16 +45,37 @@ graph = builder.compile(checkpointer=memory)
 
 from IPython.display import Image, display
 
-# display(Image(graph.get_graph().draw_mermaid_png()))
+# graph_img = Image(graph.get_graph().draw_mermaid_png())
+# with open("graph.png", "wb") as png:
+#     png.write(graph_img.image)
+
 
 config = { 'configurable': { 'thread_id' : '1'} }
 
+system_prompt = {
+    "role": "system",
+    "content": (
+        "You are a personal finance assistant with access to tools that can read PDFs and summarize data. "
+        "If the user asks about transactions, money received, or summaries from account statements, "
+        "you should use the tools like `get_data_dir_files_tool`, `pdf_parser_tool`, and `local_llm_tool` "
+        "to extract and analyze data from the files. "
+        "If a question does not require file or data access, respond directly."
+    )
+}
+user_message = {
+    "role": "user",
+    "content": (
+        "Check the bank statement PDF in the data directory and tell me how much money I received last month."
+    )
+}
 
-state = graph.invoke({"messages": [{"role": "user", "content": "Who won mens aisa cup cricket 2025?"}]} , config=config)
+
+state = graph.invoke(
+    {"messages": [system_prompt, user_message]},
+    config=config
+)
 print(state["messages"][-1].content)
 
-state = graph.invoke({"messages": [{"role": "user", "content": "And What is Rohit Sharma's?"}]} , config=config)
-print(state["messages"][-1].content)
 
-print("Chat history:")
-print(state)
+# print("Chat history:")
+# print(state)
