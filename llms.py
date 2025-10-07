@@ -1,19 +1,18 @@
 from google import genai
-import config
 import os
 from openai import OpenAI
 from langchain.llms.base import LLM
 from typing import Optional, List
-
-global_llm = None
-
-def init_llm():
-    """Initialize the LLM once and share it everywhere."""
-    global global_llm
-    if global_llm is None:
-        print("Initializing shared LLM instance...")
-        global_llm = gemini("gemini-1.5-flash")
-    return global_llm
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+import requests
+from langchain.chat_models import init_chat_model
+import requests
+from typing import List, Optional
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import Field # Needed for configuration/serialization
 
 
 class gemini:
@@ -98,8 +97,6 @@ class CustomLLM(LLM):
             self.model = gemini(model_name)
         elif model_type == "qwen":
             self.model = qwen()
-        elif model_type == "ondevicellm":
-            self.model = OnDeviceLLM()
         else:
             raise ValueError("Unsupported model type. Use 'gemini' or 'qwen'.")
 
@@ -113,79 +110,95 @@ class CustomLLM(LLM):
     
 
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from transformers import BitsAndBytesConfig
-import torch
-class OnDeviceLLM():
-    def __init__(self):
-        self.model_name = "Qwen/Qwen2.5-3B-Instruct"
-        self.quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_compute_type=torch.bfloat16
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            quantization_config=self.quantization_config,
-            # dtype=torch.int8,
-            device_map="auto",
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-
-    def generate_response(self, messages: str) -> str:
-        torch.no_grad()
-        messages = [
-            {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
-            {"role": "user", "content": messages[0]["content"]}
-        ]
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
-
-        generated_ids = self.model.generate(
-            **model_inputs,
-            max_new_tokens=512
-        )
-        generated_ids = [
-            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
-        response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        return response
+class MyCustomChatModel(BaseChatModel):
+    """
+    A custom chat model that interfaces with a local HTTP endpoint.
+    It demonstrates how to correctly handle input messages and format output.
+    """
     
-    def generate_response_with_params(self, prompt: str) -> str:
-        torch.no_grad()
-        messages = [
-            {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ]
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
-
-        generated_ids = self.model.generate(
-            **model_inputs,
-            max_new_tokens=512
-        )
-        generated_ids = [
-            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
-        response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-        return response
+    # 1. Define custom parameters using Field for Pydantic (better for LangChain integration)
+    my_custom_param: str = Field(default="default_value", description="A custom string parameter.")
     
-    def print_guide(self):
-        print("To use the OnDeviceLLM class, create an instance.")
-        print("Then, call the generate_response method with your prompt to get a response.")
-        print("Example:")
-        print("model = OnDeviceLLM()")
-        print("response = model.generate_response('Your prompt here')")
-        print("print(response)")
+    # 2. Add required attributes (like client) if needed, or in this case, the API URL
+    api_url: str = Field(default="http://localhost:8000/generate", description="The URL of the local generation API.")
+    max_tokens: int = Field(default=250, description="The maximum number of tokens to generate.")
+
+
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[object] = None,
+        **kwargs,
+    ) -> ChatResult:
+        """
+        The core logic for generating a response from the model.
+        It must return a ChatResult object.
+        """
+        
+        # --- Input Processing ---
+        # 3. Extract the prompt from the messages list. 
+        #    A simple approach is to get the content of the *last* HumanMessage.
+        #    A more complex model would process all messages to form a conversation history.
+        
+        # Find the last message that is from a human/user
+        prompt_message = next(
+            (m for m in reversed(messages) if isinstance(m, HumanMessage)), 
+            messages[-1] # Fallback to the very last message if no HumanMessage is found
+        )
+        prompt = prompt_message.content
+        
+        # --- API Call ---
+        data = {
+            "prompt": prompt, # 4. Use the actual prompt from the user input
+            "max_tokens": self.max_tokens, # Use the model's configured parameter
+            # Add any other required parameters here, like 'stop' sequences
+        }
+
+        try:
+            # 5. Add a timeout for robustness and use the configured URL
+            response = requests.post(self.api_url, json=data, timeout=30)
+            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            
+            # Assuming your local API returns a JSON like: {"text": "The answer is 'chota'."}
+            api_response_data = response.json()
+            
+            # 6. Get the generated text content. Adjust the key ('text') based on your actual API response structure.
+            response_content = api_response_data.get("text", "Error: No 'text' field in API response.")
+            
+        except requests.exceptions.RequestException as e:
+            # Handle potential connection errors, timeouts, etc.
+            print(f"Error calling local API: {e}")
+            response_content = f"API Error (using {self.api_url}): Could not connect or failed. Details: {e}"
+
+        
+        # --- Output Formatting (Required by BaseChatModel) ---
+        # 7. Create the AIMessage object with the generated content
+        ai_message = AIMessage(content=response_content)
+        
+        # 8. Wrap the AIMessage in a ChatGeneration object
+        generation = ChatGeneration(message=ai_message)
+        
+        # 9. Return the required ChatResult object
+        return ChatResult(generations=[generation])
+
+    @property
+    def _llm_type(self) -> str:
+        return "my_custom_chat_model"
+
+    # 10. (Optional but recommended) Implement the required `_get_generation_info` method 
+    #     to pass through information like token usage or log probs.
+    def _get_generation_info(self, **kwargs) -> dict:
+        """Get any model-specific information that should be included in the generation."""
+        # This example just returns the custom parameter for logging/debugging
+        return {"custom_param_used": self.my_custom_param}
+
+
+# custom_llm_instance = MyCustomChatModel(
+#     my_custom_param="the_actual_custom_value",
+#     max_tokens=500, # Optional: override default max_tokens
+#     api_url="http://localhost:8000/generate" # Optional: override default URL
+# )
 
 
 
