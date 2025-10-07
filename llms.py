@@ -1,18 +1,13 @@
 from google import genai
-import os
+import os , requests
 from openai import OpenAI
 from langchain.llms.base import LLM
 from typing import Optional, List
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-import requests
 from langchain.chat_models import init_chat_model
-import requests
-from typing import List, Optional
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage
-from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult
-from pydantic import Field # Needed for configuration/serialization
+from pydantic import Field
 
 
 class gemini:
@@ -194,11 +189,6 @@ class MyCustomChatModel(BaseChatModel):
         return {"custom_param_used": self.my_custom_param}
 
 
-# custom_llm_instance = MyCustomChatModel(
-#     my_custom_param="the_actual_custom_value",
-#     max_tokens=500, # Optional: override default max_tokens
-#     api_url="http://localhost:8000/generate" # Optional: override default URL
-# )
 
 
 
