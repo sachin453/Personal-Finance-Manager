@@ -58,7 +58,7 @@ def get_data_dir_files_tool() -> str:
 
 @tool
 def local_llm_tool(prompt: str) -> str:
-    """Send a prompt to the local LLM API and return its response."""
+    """Send a prompt to the local LLM API and return its response. Only 1000 tokens allowed."""
     try:
         resp = requests.post("http://localhost:8000/generate", json={"prompt": prompt, "max_tokens": 250})
         return resp.json().get("text", "No response.")
