@@ -18,6 +18,12 @@ HTML_FORM = """
     <form id="askForm">
         <label>Question:</label><br>
         <input type="text" id="question" name="question" size="50" required><br><br>
+        <label>Model:</label>
+        <select id="model" name="model">
+            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+            <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+            <option value="qwen">Qwen</option>
+        </select><br><br>
         <button type="submit">Ask</button>
     </form>
     <h3>Answer:</h3>
@@ -57,12 +63,14 @@ def home():
 def ask():
     data = request.json
     question = data.get("question", "")
-    model = data.get("model", "gemini-2.0-flash")  # Default model
+    # model = data.get("model", "gemini-2.0-flash")  # Default model
+    print(f"Received question: {question}")
 
     if not question:
         return jsonify({"error": "No question provided"}), 400
     try:
         answer = my_chatbot.dialogue(question)
+        print(f"Answer generated: {answer}")
         return jsonify({"answer": answer})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
