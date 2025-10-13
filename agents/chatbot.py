@@ -5,6 +5,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+import os
 
 
 class State(TypedDict):
@@ -22,6 +25,7 @@ SYSTEM_PROMPT = {
     )
 }
 
+
 class ChatbotAgent:
     def __init__(self, name:str , tools:list):
         self.name = name
@@ -36,6 +40,10 @@ class ChatbotAgent:
         self.dialogue_state = None
 
     def connect_nodes(self):
+        self._pg_context = PostgresSaver.from_conn_string(os.getenv("DATABASE_URL"))
+        self.checkpointer = self._pg_context.__enter__()
+        self.checkpointer.setup()
+        # print("DB_URL:", os.getenv("DATABASE_URL"))
         self.builder = StateGraph(State)
         self.builder.add_node("chatbot", self.chatbot)
         self.builder.add_node("tools", ToolNode(tools=self.tools))
@@ -43,7 +51,8 @@ class ChatbotAgent:
         self.builder.add_conditional_edges("chatbot" , tools_condition)
         self.builder.add_edge("tools", "chatbot")
         self.builder.add_edge("chatbot", END)
-        self.graph = self.builder.compile(checkpointer=self.memory)
+        self.graph = self.builder.compile(checkpointer=self.checkpointer)
+
 
     def chatbot(self , state: State) -> State:
         return {"messages": [self.llm_with_tools.invoke(state["messages"])]}
