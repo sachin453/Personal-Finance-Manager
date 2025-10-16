@@ -1,19 +1,18 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template_string
 from agents.common_tools import tools
+from agents.database_agent import sql_tools
 from agents.chatbot import ChatbotAgent
 from dotenv import load_dotenv
 import os
 import psycopg2
 from psycopg2 import OperationalError, InterfaceError, DatabaseError
-from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")  # required for session
 
 # --- Database connection ---
-DB_URL = os.getenv("DATABASE_URL")  # like: postgres://user:pass@host:port/dbname
+DB_URL = os.getenv("DATABASE_URL")  
 
 def get_db_connection():
     try:
@@ -42,7 +41,7 @@ if conn and cur:
 else:
     print("Warning: Database is not connected. App will not function properly.")
 
-my_chatbot = ChatbotAgent(name="FinanceBot", tools=tools)
+my_chatbot = ChatbotAgent(name="FinanceBot", tools=tools + sql_tools)
 
 
 # --- HTML Templates ---
@@ -84,9 +83,13 @@ CHAT_PAGE = """
 <head>
     <title>FinanceBot - Personal Finance Assistant</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f8; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        #chat-container { width: 480px; height: 600px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; position: relative; }
-        #logout-btn { position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+        html, body { height: 100%; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f4f6f8; height: 100vh; margin: 0; transition: background 0.3s, color 0.3s; }
+        #main-layout { display: flex; height: 100vh; width: 100vw; }
+        #left-panel { flex: 1 1 0%; min-width: 280px; background: #e9ecef; padding: 32px 24px; box-sizing: border-box; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        #left-panel h2 { margin-top: 0; }
+        #left-panel .placeholder { color: #888; font-size: 1.1em; margin-top: 40px; text-align: center; }
+        #chat-container { width: 480px; min-width: 340px; max-width: 100vw; height: 100vh; background: white; border-radius: 0 12px 12px 0; box-shadow: -4px 0 12px rgba(0,0,0,0.07); display: flex; flex-direction: column; position: relative; transition: background 0.3s, color 0.3s; }
         #chat-box { flex: 1; padding: 16px; overflow-y: auto; border-bottom: 1px solid #ddd; margin-top: 40px; }
         .message { margin: 8px 0; padding: 10px 14px; border-radius: 10px; max-width: 80%; line-height: 1.4; }
         .user { background: #DCF8C6; align-self: flex-end; }
@@ -95,22 +98,44 @@ CHAT_PAGE = """
         #question { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; outline: none; }
         button.send { margin-left: 8px; padding: 10px 16px; border: none; background: #007bff; color: white; border-radius: 8px; cursor: pointer; }
         button.send:hover { background: #0056b3; }
+        #theme-btn { position: absolute; top: 10px; left: 10px; background: #222; color: #fff; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; z-index: 2; }
+        #theme-btn.light { background: #f4f6f8; color: #222; border: 1px solid #ccc; }
+        body.dark { background: #181a1b !important; color: #e0e0e0; }
+        body.dark #left-panel { background: #23272b; color: #e0e0e0; border-right: 1px solid #333; }
+        body.dark #chat-container { background: #181a1b; color: #e0e0e0; }
+        body.dark .message.user { background: #2e7d32; color: #fff; }
+        body.dark .message.bot { background: #33373a; color: #e0e0e0; }
+        body.dark #input-area { background: #181a1b; }
+        body.dark #question { background: #23272b; color: #e0e0e0; border: 1px solid #444; }
+        body.dark button.send { background: #1565c0; }
+        body.dark button.send:hover { background: #0d47a1; }
+        @media (max-width: 900px) {
+            #main-layout { flex-direction: column; }
+            #left-panel { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid #ddd; border-radius: 0; }
+            #chat-container { max-width: 100vw; min-width: 0; border-radius: 0 0 12px 12px; }
+        }
     </style>
 </head>
 <body>
-    <div id="chat-container">
-        <button id="logout-btn" onclick="window.location.href='/logout'">Logout</button>
-        <div id="chat-box"></div>
-        <div id="input-area">
-            <input type="text" id="question" placeholder="Ask something..." autocomplete="off" />
-            <button class="send" onclick="sendMessage()">Send</button>
+    <div id="main-layout">
+        <div id="left-panel">
+            <h2>Finance Data</h2>
+            <div class="placeholder">(Your data will appear here)</div>
+        </div>
+        <div id="chat-container">
+            <button id="theme-btn" onclick="toggleTheme()">Dark Theme</button>
+            <div id="chat-box"></div>
+            <div id="input-area">
+                <input type="text" id="question" placeholder="Ask something..." autocomplete="off" />
+                <button class="send" onclick="sendMessage()">Send</button>
+            </div>
         </div>
     </div>
-
     <script>
         const chatBox = document.getElementById('chat-box');
         const input = document.getElementById('question');
-
+        const themeBtn = document.getElementById('theme-btn');
+        let darkMode = false;
         function appendMessage(text, sender) {
             const msg = document.createElement('div');
             msg.classList.add('message', sender);
@@ -118,28 +143,30 @@ CHAT_PAGE = """
             chatBox.appendChild(msg);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
-
         async function sendMessage() {
             const question = input.value.trim();
             if (!question) return;
             appendMessage(question, 'user');
             input.value = '';
             appendMessage('Typing...', 'bot');
-
             const response = await fetch('/ask', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ question })
             });
-
             const data = await response.json();
             chatBox.lastChild.remove(); // remove "Typing..."
             appendMessage(data.answer || data.error || "Error", 'bot');
         }
-
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter') sendMessage();
         });
+        function toggleTheme() {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark', darkMode);
+            themeBtn.textContent = darkMode ? 'Light Theme' : 'Dark Theme';
+            themeBtn.classList.toggle('light', !darkMode);
+        }
     </script>
 </body>
 </html>
@@ -190,74 +217,26 @@ def ensure_db():
 # --- Routes ---
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        if not username or not password:
-            return render_template_string(SIGNUP_PAGE, error="Please provide username and password.")
-
-        hashed_password = generate_password_hash(password)
-        conn, cur = ensure_db()
-        if not conn or not cur:
-            return render_template_string(SIGNUP_PAGE, error="Database unavailable. Try again later.")
-
-        try:
-            cur.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, hashed_password))
-            conn.commit()
-            return render_template_string(SIGNUP_PAGE, success="Account created! You can now login.")
-        except psycopg2.IntegrityError:
-            conn.rollback()
-            return render_template_string(SIGNUP_PAGE, error="Username already exists.")
-        except Exception as e:
-            conn.rollback()
-            return render_template_string(SIGNUP_PAGE, error=str(e))
-
-    return render_template_string(SIGNUP_PAGE)
+    return "Sign up is disabled.", 403
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-
-        conn, cur = ensure_db()
-        if not conn or not cur:
-            return render_template_string(LOGIN_PAGE, error="Database unavailable. Try again later.")
-
-        cur.execute("SELECT password FROM users WHERE username = %s", (username,))
-        user = cur.fetchone()
-        if user and check_password_hash(user[0], password):
-            session["logged_in"] = True
-            session["username"] = username
-            return redirect(url_for("home"))
-        else:
-            return render_template_string(LOGIN_PAGE, error="Invalid credentials.")
-
-    return render_template_string(LOGIN_PAGE)
-
+    return "Login is disabled.", 403
 
 @app.route("/logout")
 def logout():
-    session.pop("logged_in", None)
-    session.pop("username", None)
-    return redirect(url_for("login"))
+    return "Logout is disabled.", 403
 
 @app.route("/")
 def home():
-    if not session.get("logged_in"):
-        return redirect(url_for("login"))
     return render_template_string(CHAT_PAGE)
 
 @app.route("/ask", methods=["POST"])
 def ask():
-    if not session.get("logged_in"):
-        return jsonify({"error": "Unauthorized"}), 401
-
     data = request.json
     question = data.get("question", "")
     if not question:
         return jsonify({"error": "No question provided"}), 400
-
     try:
         answer = my_chatbot.dialogue(question)
         return jsonify({"answer": answer})
